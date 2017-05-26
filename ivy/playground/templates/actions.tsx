@@ -5,7 +5,7 @@ import { generateInputMap } from '../contracts/selectors'
 // internal imports
 import { INITIAL_ID_LIST } from './constants'
 import { getSourceMap, hasSourceChanged } from './selectors'
-import { CompiledTemplate } from './types'
+import { CompilerResult, CompiledTemplate } from './types'
 
 export const loadTemplate = (selected: string) => {
   return (dispatch, getState) => {
@@ -52,17 +52,77 @@ export const FETCH_COMPILED = 'templates/FETCH_COMPILED'
 
 export const fetchCompiled = (source: string) => {
   return (dispatch, getState) => {
-    return client.ivy.compile({ contract: source }).then((result) => {
-      const type = FETCH_COMPILED
-      const format = (tpl: CompiledTemplate) => {
-        if (tpl.error !== '') {
-          tpl.clauseInfo = tpl.params = []
+    const type = FETCH_COMPILED
+    const importCheck = source.match(/\bcontract\b[\s\S]*\bimport\b/gm)
+    if (importCheck !== null) {
+      // An invalid import statement has been found.
+      const compiled: CompiledTemplate = {
+        name: '',
+        params: [],
+        clauses: [],
+        value: '',
+        bodyBytecode: '',
+        bodyOpcodes: '',
+        recursive: false,
+        source,
+        error: 'All import statements should appear before contract expression.'
+      }
+      const inputMap = {}
+      return dispatch({ type, compiled, inputMap })
+    }
+
+    const contractCheck = source.match(/\bcontract\b/gm)
+    if (contractCheck && contractCheck.length > 1) {
+      // Multiple contract expressions found.
+      const compiled: CompiledTemplate = {
+        name: '',
+        params: [],
+        clauses: [],
+        value: '',
+        bodyBytecode: '',
+        bodyOpcodes: '',
+        recursive: false,
+        source,
+        error: 'Only 1 contract expression allowed.'
+      }
+      const inputMap = {}
+      return dispatch({ type, compiled, inputMap })
+    }
+
+    const sourceMap = getSourceMap(getState())
+    const transform = (source: string) => {
+      return source.replace(/\bimport\b(.*)$/gm, (match, contractName) => sourceMap[contractName])
+    }
+    const transformed = transform(source)
+    return client.ivy.compile({ source: transformed }).then((result: CompilerResult) => {
+      const format = (result: CompilerResult) => {
+        if (result.error) {
+          return {
+            name: '',
+            params: [],
+            clauses: [],
+            value: '',
+            bodyBytecode: '',
+            bodyOpcodes: '',
+            recursive: false,
+            source,
+            error: result.error
+          } as CompiledTemplate
         }
-        return tpl
+
+        const compiled: CompiledTemplate = result.contracts[result.contracts.length-1]
+        return {
+          ...compiled,
+          source,
+          error: ''
+        }
       }
       const compiled = format(result)
-      const inputMap = generateInputMap(compiled)
-      dispatch({ type, compiled, inputMap })
+      let inputMap = {}
+      if (compiled) {
+        inputMap = generateInputMap(compiled)
+      }
+      return dispatch({ type, compiled, inputMap })
     }).catch((e) => {throw e})
   }
 }

@@ -48,14 +48,17 @@ export default function reducer(state: ContractsState = INITIAL_STATE, action): 
     case CREATE_CONTRACT: // reset keys etc. this is safe (the action already has this stuff)
       const controlProgram = action.controlProgram
       const hash = action.utxo.transactionId
-      const template: CompiledTemplate = action.template
-      const clauseNames = template.clauseInfo.map(clause => clause.name)
+      const template: CompiledTemplate = {
+        ...action.template,
+        source: action.source
+      }
+      const clauseNames = template.clauses.map(clause => clause.name)
       const clauseParameterIds = {}
       const inputs: Input[] = []
-      for (const clause of template.clauseInfo) {
-        clauseParameterIds[clause.name] = clause.args.map(param => "clauseParameters." + clause.name + "." + param.name)
-        for (let param of clause.args) {
-          switch(param.type) {
+      for (const clause of template.clauses) {
+        clauseParameterIds[clause.name] = clause.params.map(param => "clauseParameters." + clause.name + "." + param.name)
+        for (let param of clause.params) {
+          switch(param.declaredType) {
             case "Sha3(PublicKey)": {
               const hashParam = {
                 type: "hashType",
@@ -93,11 +96,11 @@ export default function reducer(state: ContractsState = INITIAL_STATE, action): 
               break
             }
             default:
-              addParameterInput(inputs, param.type as ClauseParameterType, "clauseParameters." + clause.name + "." + param.name)
+              addParameterInput(inputs, param.declaredType as ClauseParameterType, "clauseParameters." + clause.name + "." + param.name)
           }
         }
 
-        for (const value of clause.valueInfo) {
+        for (const value of clause.values) {
           if (value.name === template.value) {
             // This is the unlock statement.
             // Do not add it to the spendInputMap.
@@ -116,7 +119,7 @@ export default function reducer(state: ContractsState = INITIAL_STATE, action): 
         }
       }
       const contract: Contract = {
-        template: action.template,
+        template,
         id: hash,
         unlockTxid: '',
         outputId: action.utxo.id,

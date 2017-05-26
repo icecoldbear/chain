@@ -149,7 +149,7 @@ export const getSelectedClause = createSelector(
   getSpendContract,
   getSelectedClauseIndex,
   (spendContract, clauseIndex) => {
-    return spendContract.template.clauseInfo[clauseIndex]
+    return spendContract.template.clauses[clauseIndex]
   }
 )
 
@@ -160,7 +160,7 @@ export const getClauseName = createSelector(
 
 export const getClauseParameters = createSelector(
   getSelectedClause,
-  (clause) => clause.args
+  (clause) => clause.params
 )
 
 export const getClauseParameterIds = createSelector(
@@ -191,7 +191,7 @@ export const getClauseWitnessComponents = createSelector(
     const witness: WitnessComponent[] = []
     clauseParameters.forEach(clauseParameter => {
       const clauseParameterPrefix = "clauseParameters." + clauseName + "." + clauseParameter.name
-      switch (clauseParameter.type) {
+      switch (clauseParameter.declaredType) {
         case "PublicKey": {
           const inputId = clauseParameterPrefix + ".publicKeyInput.provideStringInput"
           const input = spendInputMap[inputId]
@@ -265,7 +265,7 @@ export const getClauseWitnessComponents = createSelector(
 export const getClauseValueInfo = createSelector(
   getSelectedClause,
   (clause) => {
-    return clause.valueInfo
+    return clause.values
   }
 )
 
@@ -274,7 +274,7 @@ export const getClauseUnlockInput = createSelector(
   getSpendInputMap,
   (clause, spendInputMap) => {
     let input
-    clause.valueInfo.forEach(value => {
+    clause.values.forEach(value => {
       if (value.program === undefined) {
         input = spendInputMap["unlockValue.accountInput"]
       }
@@ -304,7 +304,11 @@ export const getClauseMintimes = createSelector(
   getSelectedClauseIndex,
   (spendContract, clauseIndex) => {
     const clauseName = spendContract.clauseList[clauseIndex]
-    const mintimes = spendContract.template.clauseInfo[clauseIndex].mintimes
+    const mintimes = spendContract.template.clauses[clauseIndex].mintimes
+    if (mintimes === undefined) {
+      return []
+    }
+
     return mintimes.map(argName => {
       const inputMap = spendContract.inputMap
       return new Date(inputMap["contractParameters." + argName + ".timeInput.timestampTimeInput"].value)
@@ -317,9 +321,10 @@ export const getClauseMaxtimes = createSelector(
   getSelectedClauseIndex,
   (spendContract, clauseIndex) => {
     const clauseName = spendContract.clauseList[clauseIndex]
-    const maxtimes = spendContract.template.clauseInfo[clauseIndex].maxtimes
-    if (maxtimes === undefined)
+    const maxtimes = spendContract.template.clauses[clauseIndex].maxtimes
+    if (maxtimes === undefined) {
       return []
+    }
 
     return maxtimes.map(argName => {
       const inputMap = spendContract.inputMap
@@ -365,7 +370,7 @@ export const getRequiredAssetAmount = createSelector(
   getClauseValueInfo,
   getInputMap,
   getSpendInputMap,
-  (clauseValuePrefix, valueInfo, inputMap, spendInputMap) => {
+  (clauseValuePrefix, values, inputMap, spendInputMap) => {
     if (clauseValuePrefix === undefined) {
       return undefined
     }
@@ -375,7 +380,7 @@ export const getRequiredAssetAmount = createSelector(
       return undefined
     }
 
-    const valueArg = valueInfo.find(info => {
+    const valueArg = values.find(info => {
       return info.name === name
     })
     if (valueArg === undefined) {
@@ -424,8 +429,8 @@ export const getRequiredValueAction = createSelector(
 export const getLockActions = createSelector(
   getInputMap,
   getClauseValueInfo,
-  (inputMap, valueInfo) => {
-    return valueInfo
+  (inputMap, values) => {
+    return values
       .filter(value => value.program !== undefined)
       .map(value => {
         const progName = value.program
@@ -483,7 +488,7 @@ export const isFirstTime = createSelector(
 export const generateInputMap = (compiled: CompiledTemplate): InputMap => {
   let inputs: Input[] = []
   for (const param of compiled.params) {
-    switch(param.type) {
+    switch(param.declaredType) {
       case "Sha3(PublicKey)": {
         const hashParam = {
           type: "hashType",
@@ -521,7 +526,7 @@ export const generateInputMap = (compiled: CompiledTemplate): InputMap => {
         break
       }
       default:
-        addParameterInput(inputs, param.type as ClauseParameterType, "contractParameters." + param.name)
+        addParameterInput(inputs, param.declaredType as ClauseParameterType, "contractParameters." + param.name)
     }
   }
 
