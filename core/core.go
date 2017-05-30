@@ -171,8 +171,25 @@ func (a *API) initCluster(ctx context.Context) error {
 func (a *API) joinCluster(ctx context.Context, x struct {
 	BootAddress string `json:"boot_address"`
 }) error {
-	// validate the format of the boot address
-	_, _, err := net.SplitHostPort(x.BootAddress)
+	if err := validateAddress(x.BootAddress); err != nil {
+		return err
+	}
+
+	bootURL := fmt.Sprintf("https://%s", x.BootAddress)
+	return a.sdb.RaftService().Join(bootURL)
+}
+
+func (a *API) evict(ctx context.Context, x struct {
+	NodeAddress string `json:"node_address"`
+}) error {
+	if err := validateAddress(x.NodeAddress); err != nil {
+		return err
+	}
+	return a.sdb.RaftService().Evict(ctx, x.NodeAddress)
+}
+
+func validateAddress(addr string) error {
+	_, _, err := net.SplitHostPort(addr)
 	if err != nil {
 		newerr := errors.Sub(errInvalidAddr, err)
 		if addrErr, ok := err.(*net.AddrError); ok {
@@ -180,9 +197,7 @@ func (a *API) joinCluster(ctx context.Context, x struct {
 		}
 		return newerr
 	}
-
-	bootURL := fmt.Sprintf("https://%s", x.BootAddress)
-	return a.sdb.RaftService().Join(bootURL)
+	return nil
 }
 
 func closeConnOK(w http.ResponseWriter, req *http.Request) {

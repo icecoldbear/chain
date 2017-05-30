@@ -65,6 +65,9 @@ var (
 	// ErrPeerUninitialized is returned when a peer node indicates it's
 	// not yet initialized.
 	ErrPeerUninitialized = errors.New("peer is uninitialized")
+
+	// ErrUnknownPeer is returned when the specified peer doesn't exist.
+	ErrUnknownPeer = errors.New("unknown peer")
 )
 
 var (
@@ -126,8 +129,8 @@ type State interface {
 	Apply(data []byte, index uint64) (satisfied bool)
 	Snapshot() (data []byte, index uint64, err error)
 	RestoreSnapshot(data []byte, index uint64) error
+	Peers() map[uint64]string
 	SetPeerAddr(id uint64, addr string)
-	GetPeerAddr(id uint64) (addr string)
 	RemovePeerAddr(id uint64)
 	IsAllowedMember(addr string) bool
 	NextNodeID() (id, version uint64)
@@ -670,6 +673,35 @@ func (sv *Service) serveJoin(w http.ResponseWriter, req *http.Request) {
 	json.NewEncoder(w).Encode(nodeJoin{newID, snapData})
 }
 
+// Evict removes the node with the provided address from the raft cluster.
+// It does not modify the allowed member list.
+func (sv *Service) Evict(ctx context.Context, nodeAddr string) error {
+	if !sv.initialized() {
+		return ErrUninitialized
+	}
+
+	// Lookup the node ID of the node to evict.
+	err := sv.WaitRead(ctx)
+	if err != nil {
+		return err
+	}
+	var evictNodeID uint64
+	for nodeID, addr := range sv.state.Peers() {
+		if addr == nodeAddr {
+			evictNodeID = nodeID
+		}
+	}
+	if evictNodeID == 0 {
+		return errors.WithDetailf(ErrUnknownPeer, "The cluster has no peer with address %q.", nodeAddr)
+	}
+
+	return sv.raftNode.ProposeConfChange(ctx, raftpb.ConfChange{
+		ID:     atomic.AddUint64(&sv.confChangeID, 1),
+		Type:   raftpb.ConfChangeRemoveNode,
+		NodeID: evictNodeID,
+	})
+}
+
 // join attempts to join the cluster.
 // It requests an existing member to propose a configuration change
 // adding the local process as a new member, then retrieves its new ID
@@ -835,7 +867,7 @@ func (sv *Service) send(msgs []raftpb.Message) {
 			panic(err)
 		}
 		sv.stateMu.Lock()
-		addr := sv.state.GetPeerAddr(msg.To)
+		addr := sv.state.Peers()[msg.To]
 		sv.stateMu.Unlock()
 		if addr == "" {
 			log.Printkv(context.Background(), "no-addr-for-peer", msg.To)
