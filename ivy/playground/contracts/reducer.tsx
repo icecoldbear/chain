@@ -56,6 +56,10 @@ export default function reducer(state: ContractsState = INITIAL_STATE, action): 
       const clauseParameterIds = {}
       const inputs: Input[] = []
       for (const clause of template.clauses) {
+        if (clause.params === undefined) {
+          continue
+        }
+
         clauseParameterIds[clause.name] = clause.params.map(param => "clauseParameters." + clause.name + "." + param.name)
         for (let param of clause.params) {
           switch(param.declaredType) {
