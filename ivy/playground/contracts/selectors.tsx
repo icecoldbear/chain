@@ -14,7 +14,7 @@ import {
 } from './types'
 
 import {
-  HashFunction,
+  Hash,
   ClauseParameterType,
   Input,
   InputMap,
@@ -489,40 +489,8 @@ export const generateInputMap = (compiled: CompiledTemplate): InputMap => {
   let inputs: Input[] = []
   for (const param of compiled.params) {
     switch(param.declaredType) {
-      case "Sha3(PublicKey)": {
-        const hashParam = {
-          type: "hashType",
-          inputType: "PublicKey",
-          hashFunction: "sha3" as HashFunction
-        }
-        addParameterInput(inputs, hashParam as ClauseParameterType, "contractParameters." + param.name)
-        break
-      }
-      case "Sha3(String)": {
-        const hashParam = {
-          type: "hashType",
-          inputType: "String",
-          hashFunction: "sha3" as HashFunction
-        }
-        addParameterInput(inputs, hashParam as ClauseParameterType, "contractParameters." + param.name)
-        break
-      }
-      case "Sha256(PublicKey)": {
-        const hashParam = {
-          type: "hashType",
-          inputType: "PublicKey",
-          hashFunction: "sha256" as HashFunction
-        }
-        addParameterInput(inputs, hashParam as ClauseParameterType, "contractParameters." + param.name)
-        break
-      }
-      case "Sha256(String)": {
-        const hashParam = {
-          type: "hashType",
-          inputType: "String",
-          hashFunction: "sha256" as HashFunction
-        }
-        addParameterInput(inputs, hashParam as ClauseParameterType, "contractParameters." + param.name)
+      case "Hash": {
+        addParameterInput(inputs,  { type: param.declaredType, hashType: param.inferredType } as ClauseParameterType, "contractParameters." + param.name)
         break
       }
       default:

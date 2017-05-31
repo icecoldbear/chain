@@ -1,10 +1,11 @@
-import { ClauseParameterType, ContractParameterType, InputMap } from '../inputs/types'
+import { ClauseParameterType, ContractParameterType, HashType, InputMap } from '../inputs/types'
 
 export type SourceMap = { [s: string]: string }
 
 export type Param = {
-  name: string,
+  name: string
   declaredType: ContractParameterType | ClauseParameterType
+  inferredType?: HashType
 }
 
 export type HashCall = {

@@ -2,7 +2,7 @@
 import { ContractsState } from './types'
 import { getParameterIds } from '../templates/selectors'
 import { CompiledTemplate } from '../templates/types'
-import { ClauseParameterType, Input, InputMap, HashFunction } from '../inputs/types'
+import { ClauseParameterType, Input, InputMap, Hash } from '../inputs/types'
 import { getInputMap } from '../templates/selectors'
 import { addParameterInput } from '../inputs/data'
 
@@ -63,41 +63,8 @@ export default function reducer(state: ContractsState = INITIAL_STATE, action): 
         clauseParameterIds[clause.name] = clause.params.map(param => "clauseParameters." + clause.name + "." + param.name)
         for (let param of clause.params) {
           switch(param.declaredType) {
-            case "Sha3(PublicKey)": {
-              const hashParam = {
-                type: "hashType",
-                inputType: "PublicKey",
-                hashFunction: "sha3" as HashFunction
-              }
-              addParameterInput(inputs, hashParam as ClauseParameterType, "clauseParameters." + clause.name + "." + param.name)
-              break
-            }
-            case "Sha3(String)": {
-              const hashParam = {
-                type: "hashType",
-                inputType: "String",
-                hashFunction: "sha3" as HashFunction
-              }
-              addParameterInput(inputs, hashParam as ClauseParameterType, "clauseParameters." + clause.name + "." + param.name)
-              break
-            }
-            case "Sha256(PublicKey)": {
-              const hashParam = {
-                type: "hashType",
-                inputType: "PublicKey",
-                hashFunction: "sha256" as HashFunction
-              }
-              addParameterInput(inputs, hashParam as ClauseParameterType, "clauseParameters." + clause.name + "." + param.name)
-              break
-            }
-            case "Sha256(String)": {
-              const hashParam = {
-                type: "hashType",
-                inputType: "String",
-                hashFunction: "sha256" as HashFunction
-              }
-              addParameterInput(inputs, hashParam as ClauseParameterType, "clauseParameters." + clause.name + "." + param.name)
-              break
+            case "Hash": {
+              addParameterInput(inputs, { type: param.declaredType, hashType: param.declaredType } as ClauseParameterType, "clauseParameters." + clause.name + "." + param.name)
             }
             default:
               addParameterInput(inputs, param.declaredType as ClauseParameterType, "clauseParameters." + clause.name + "." + param.name)
