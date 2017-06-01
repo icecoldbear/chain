@@ -6,6 +6,7 @@ import { generateInputMap } from '../contracts/selectors'
 import { INITIAL_ID_LIST } from './constants'
 import { getSourceMap, hasSourceChanged } from './selectors'
 import { CompilerResult, CompiledTemplate } from './types'
+import { makeEmptyTemplate, formatCompilerResult } from './util'
 
 export const loadTemplate = (selected: string) => {
   return (dispatch, getState) => {
@@ -56,17 +57,8 @@ export const fetchCompiled = (source: string) => {
     const importCheck = source.match(/\bcontract\b[\s\S]*\bimport\b/gm)
     if (importCheck !== null) {
       // An invalid import statement has been found.
-      const compiled: CompiledTemplate = {
-        name: '',
-        params: [],
-        clauses: [],
-        value: '',
-        bodyBytecode: '',
-        bodyOpcodes: '',
-        recursive: false,
-        source,
-        error: 'All import statements should appear before contract expression.'
-      }
+      const errMsg = 'All import statements should appear before contract expression.'
+      const compiled: CompiledTemplate = makeEmptyTemplate(source, errMsg)
       const inputMap = {}
       return dispatch({ type, compiled, inputMap })
     }
@@ -74,17 +66,8 @@ export const fetchCompiled = (source: string) => {
     const contractCheck = source.match(/\bcontract\b/gm)
     if (contractCheck && contractCheck.length > 1) {
       // Multiple contract expressions found.
-      const compiled: CompiledTemplate = {
-        name: '',
-        params: [],
-        clauses: [],
-        value: '',
-        bodyBytecode: '',
-        bodyOpcodes: '',
-        recursive: false,
-        source,
-        error: 'Only 1 contract expression allowed.'
-      }
+      const errMsg = 'Only 1 contract expression allowed.'
+      const compiled: CompiledTemplate = makeEmptyTemplate(source, errMsg)
       const inputMap = {}
       return dispatch({ type, compiled, inputMap })
     }
@@ -95,29 +78,17 @@ export const fetchCompiled = (source: string) => {
     }
     const transformed = transform(source)
     return client.ivy.compile({ source: transformed }).then((result: CompilerResult) => {
-      const format = (result: CompilerResult) => {
-        if (result.error) {
-          return {
-            name: '',
-            params: [],
-            clauses: [],
-            value: '',
-            bodyBytecode: '',
-            bodyOpcodes: '',
-            recursive: false,
-            source,
-            error: result.error
-          } as CompiledTemplate
-        }
-
-        const compiled: CompiledTemplate = result.contracts[result.contracts.length-1]
-        return {
-          ...compiled,
-          source,
-          error: ''
-        }
+      if (result.error) {
+        return makeEmptyTemplate(source, result.error)
       }
-      const compiled = format(result)
+
+      const formatted: CompilerResult = formatCompilerResult(result)
+      const compiled: CompiledTemplate = ({
+        ...formatted.contracts[formatted.contracts.length-1],
+        source,
+        error: ''
+      } as CompiledTemplate)
+
       let inputMap = {}
       if (compiled) {
         inputMap = generateInputMap(compiled)

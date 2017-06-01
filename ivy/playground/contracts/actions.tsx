@@ -5,6 +5,8 @@ import { push } from 'react-router-redux'
 import { getItemMap } from '../assets/selectors';
 import { getItem } from '../accounts/selectors';
 import { fetch } from '../accounts/actions';
+import { CompilerResult, CompiledTemplate } from '../templates/types'
+import { makeEmptyTemplate, formatCompilerResult } from '../templates/util'
 import {
   setSource,
   updateLockError,
@@ -141,11 +143,21 @@ export const create = () => {
     })
 
     Promise.all([promisedInputMap, promisedTemplate, promisedUtxo]).then(([inputMap, result, utxo]) => {
+      if (result.error) {
+        return makeEmptyTemplate(source, result.error)
+      }
+
+      const formatted: CompilerResult = formatCompilerResult(result)
+      const template: CompiledTemplate = ({
+        ...formatted.contracts[formatted.contracts.length-1],
+        source,
+        error: ''
+      } as CompiledTemplate)
       dispatch({
         type: CREATE_CONTRACT,
         controlProgram: result.programMap[name],
         source,
-        template: result.contracts[result.contracts.length-1],
+        template,
         inputMap,
         utxo
       })
